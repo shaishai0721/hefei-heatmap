@@ -1,0 +1,1783 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>合肥市企业覆盖热力图</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+/* ─── RESET & TOKENS ─────────────────────────────── */
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:        #f1f5f9;
+  --card:      #ffffff;
+  --surface:   #f8fafc;
+  --border:    #e2e8f0;
+  --border-lt: rgba(0,0,0,0.05);
+
+  --ink-1:     #0f172a;
+  --ink-2:     #334155;
+  --ink-3:     #64748b;
+  --ink-4:     #94a3b8;
+
+  --blue:      #2563eb;
+  --blue-lt:   #eff6ff;
+  --blue-bd:   #bfdbfe;
+
+  --orange:    #ea580c;
+  --amber:     #d97706;
+  --green:     #16a34a;
+  --purple:    #7c3aed;
+  --teal:      #0891b2;
+  --slate:     #475569;
+
+  --sh-xs: 0 1px 2px rgba(0,0,0,0.05);
+  --sh-sm: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  --sh-md: 0 4px 12px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.04);
+  --sh-lg: 0 10px 24px rgba(0,0,0,0.09), 0 4px 8px rgba(0,0,0,0.04);
+
+  --r: 12px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+}
+
+body{
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--bg);
+  color: var(--ink-1);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── LAYOUT ──────────────────────────────────────── */
+#app{
+  max-width: 1380px;
+  margin: 0 auto;
+  padding: 32px 40px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.card{
+  background: var(--card);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--border);
+  box-shadow: var(--sh-sm);
+  overflow: hidden;
+}
+
+/* ─── SECTION HEADER ──────────────────────────────── */
+.sec-head{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 28px 18px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  background: linear-gradient(to right, #fafbff, #fff 60%);
+}
+.sec-title{
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink-1);
+  letter-spacing: -.3px;
+}
+.sec-sub{
+  font-size: 12.5px;
+  color: var(--ink-4);
+  margin-top: 3px;
+}
+.sec-desc{
+  font-size: 13px;
+  color: var(--ink-3);
+  margin-top: 5px;
+  line-height: 1.6;
+  max-width: 680px;
+}
+.sec-meta{
+  font-size: 12px;
+  color: var(--ink-4);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* ─── TAB GROUP ───────────────────────────────────── */
+.tab-group{
+  display: flex;
+  gap: 3px;
+  background: var(--surface);
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+.tab-btn{
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 16px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.tab-btn.active{
+  background: var(--blue);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(37,99,235,.35);
+}
+.tab-btn:hover:not(.active){ background: rgba(0,0,0,.04); color: var(--ink-2); }
+
+.tab-pane{ display: none; padding: 28px; }
+.tab-pane.active{ display: block; }
+
+/* ─── STAT KPI STRIP ──────────────────────────────── */
+.kpi-strip{
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 14px;
+  margin-bottom: 28px;
+}
+.kpi-card{
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 18px 16px 14px;
+  transition: box-shadow .15s, transform .15s;
+  cursor: default;
+}
+.kpi-card:hover{ box-shadow: var(--sh-md); transform: translateY(-1px); }
+.kpi-card-label{
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-4);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin-bottom: 10px;
+}
+.kpi-card-val{
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--ink-1);
+  line-height: 1;
+  letter-spacing: -1px;
+}
+.kpi-card-unit{
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink-3);
+  letter-spacing: 0;
+}
+.kpi-card-note{
+  font-size: 11.5px;
+  color: var(--ink-4);
+  margin-top: 8px;
+  line-height: 1.4;
+}
+.kpi-card-insight{
+  font-size: 11.5px;
+  color: var(--blue);
+  margin-top: 6px;
+  line-height: 1.45;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+/* ─── INDUSTRY CARDS ──────────────────────────────── */
+.ind-grid{
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+.ind-card{
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 16px 16px 16px 20px;
+  border-left-width: 3px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  transition: box-shadow .15s, transform .15s;
+}
+.ind-card:hover{ box-shadow: var(--sh-md); transform: translateY(-1px); }
+.ind-card.nev{ border-left-color: #f97316; }
+.ind-card.ic { border-left-color: #7c3aed; }
+.ind-card.disp{ border-left-color: #0ea5e9; }
+.ind-card.ai { border-left-color: #10b981; }
+.ind-icon{ font-size: 20px; line-height: 1; flex-shrink: 0; margin-top: 1px; }
+.ind-name{ font-size: 14px; font-weight: 600; color: var(--ink-1); margin-bottom: 5px; }
+.ind-note{ font-size: 12px; color: var(--ink-3); line-height: 1.6; }
+.ind-badge{
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-top: 7px;
+}
+.ind-card.nev .ind-badge{ background: #ffedd5; color: #9a3412; }
+.ind-card.ic  .ind-badge{ background: #ede9fe; color: #4c1d95; }
+.ind-card.disp .ind-badge{ background: #e0f2fe; color: #0c4a6e; }
+.ind-card.ai   .ind-badge{ background: #dcfce7; color: #064e3b; }
+
+/* ─── ENTERPRISE TABLE ────────────────────────────── */
+.ent-tbl{ width: 100%; border-collapse: collapse; font-size: 13px; }
+.ent-tbl th{
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-4);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  text-align: left;
+  white-space: nowrap;
+}
+.ent-tbl td{ padding: 10px 14px; border-bottom: 1px solid var(--border-lt); vertical-align: middle; }
+.ent-tbl tr:last-child td{ border-bottom: none; }
+.ent-tbl tr:hover td{ background: var(--surface); cursor: pointer; }
+.ent-rn{
+  display: inline-flex;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.rn-top{ background: #f97316; color: #fff; }
+.rn-norm{ background: var(--surface); border: 1px solid var(--border); color: var(--ink-3); }
+.ent-name-pri{ font-weight: 600; color: var(--ink-1); }
+.ent-name-sec{ font-size: 11px; color: var(--ink-4); margin-top: 1px; }
+.ent-zone-tag{
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.et-jk{ background: #ffedd5; color: #9a3412; }
+.et-hx{ background: #ede9fe; color: #4c1d95; }
+.et-xz{ background: #e0f2fe; color: #0c4a6e; }
+.et-yh{ background: #dcfce7; color: #064e3b; }
+.et-sk{ background: #fef9c3; color: #713f12; }
+.et-lj{ background: #fdf4ff; color: #701a75; }
+
+/* ─── ECON BARS ───────────────────────────────────── */
+.econ-tbl{ width: 100%; display: flex; flex-direction: column; gap: 0; }
+.econ-row{
+  display: grid;
+  grid-template-columns: 68px 1fr 80px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0 4px;
+  border-bottom: 1px solid var(--border-lt);
+}
+.econ-row:last-child{ border-bottom: none; }
+.econ-lbl{ font-size: 12.5px; font-weight: 500; color: var(--ink-2); text-align: right; }
+.econ-bar-bg{
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+}
+.econ-bar-bg:hover .econ-bar{ opacity: .8; }
+.econ-bar{ height: 100%; border-radius: 4px; transition: width .6s ease; }
+.econ-vals{ display: flex; flex-direction: column; }
+.econ-gdp{ font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.econ-pop{ font-size: 11px; color: var(--ink-4); }
+.econ-note{
+  grid-column: 2 / 4;
+  font-size: 11px;
+  color: var(--ink-4);
+  margin-top: -2px;
+  padding-bottom: 4px;
+}
+
+/* ─── ZONE CARDS ──────────────────────────────────── */
+.zone-note{
+  background: var(--blue-lt);
+  border: 1px solid var(--blue-bd);
+  border-radius: var(--r);
+  padding: 12px 18px;
+  font-size: 12.5px;
+  color: #1e40af;
+  line-height: 1.85;
+  margin-bottom: 20px;
+}
+.zone-grid{
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+.zone-card{
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 16px;
+  transition: box-shadow .15s, transform .15s;
+}
+.zone-card:hover{ box-shadow: var(--sh-md); transform: translateY(-1px); }
+.zc-top{ display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
+.zc-name{ font-size: 15px; font-weight: 700; color: var(--ink-1); }
+.zc-parent{ font-size: 11px; color: var(--ink-4); }
+.zc-badge{
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 5px;
+  margin-bottom: 10px;
+}
+.zcb-hot{ background: var(--blue); color: #fff; }
+.zcb-norm{ background: #f1f5f9; color: var(--ink-3); border: 1px solid var(--border); }
+.zc-items{ display: flex; flex-direction: column; gap: 3px; }
+.zc-item{ font-size: 12.5px; color: var(--ink-3); line-height: 1.6; }
+.zc-item:first-child{ color: var(--ink-2); font-weight: 500; }
+.zc-footer{ font-size: 12px; font-weight: 600; color: var(--blue); margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-lt); }
+
+/* ─── RANKING TABLE SECTION ───────────────────────── */
+.rank-tbl-wrap{ overflow: hidden; }
+.rank-tbl{ width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.rank-tbl th{
+  padding: 13px 20px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--ink-4);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.rank-tbl td{ padding: 13px 20px; border-bottom: 1px solid rgba(0,0,0,0.04); vertical-align: middle; }
+.rank-tbl tr:last-child td{ border-bottom: none; }
+.rank-tbl tr:hover td{ background: #f8fafc; cursor: pointer; }
+.rn-badge{
+  display: inline-flex;
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+.rn-1{ background: #f59e0b; color: #fff; }
+.rn-2{ background: #94a3b8; color: #fff; }
+.rn-3{ background: #d97706; color: #fff; }
+.rn-n{ background: var(--surface); border: 1px solid var(--border); color: var(--ink-3); }
+.den-hi{ color: #dc2626; font-weight: 700; }
+.den-md{ color: #ea580c; font-weight: 600; }
+.den-lo{ color: #16a34a; font-weight: 600; }
+.den-0 { color: var(--ink-4); }
+.cover-tag{
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.ct-h{ background: #fee2e2; color: #991b1b; }
+.ct-w{ background: #ffedd5; color: #9a3412; }
+.ct-m{ background: #fef9c3; color: #854d0e; }
+.ct-c{ background: #dcfce7; color: #15803d; }
+.ct-g{ background: var(--blue-lt); color: var(--blue); }
+
+/* ─── MAP SECTION ─────────────────────────────────── */
+.map-card{ padding: 0; }
+
+.map-toolbar{
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0 28px;
+  border-bottom: 1px solid var(--border);
+  min-height: 68px;
+  flex-wrap: wrap;
+  background: linear-gradient(to right, #fafbff, #fff 60%);
+}
+.map-toolbar-title{ flex: 0 0 auto; padding: 16px 28px 16px 0; border-right: 1px solid var(--border); margin-right: 0; }
+.map-title{ font-size: 16px; font-weight: 700; color: var(--ink-1); letter-spacing: -.2px; }
+.map-sub  { font-size: 12px; color: var(--ink-4); margin-top: 2px; }
+
+.map-kpis{
+  display: flex;
+  align-items: stretch;
+  flex: 1;
+  padding: 0 28px;
+}
+.mk-item{
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 14px 24px;
+  text-align: center;
+}
+.mk-item:not(:last-child){ border-right: 1px solid var(--border); }
+.mk-num{
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--ink-1);
+  line-height: 1;
+  letter-spacing: -1px;
+}
+.mk-unit{ font-size: 13px; font-weight: 500; color: var(--ink-3); }
+.mk-lbl{
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  color: var(--ink-4);
+  margin-top: 5px;
+}
+
+.map-toggle{
+  display: flex;
+  gap: 4px;
+  background: var(--surface);
+  padding: 4px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.toggle-btn{
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.toggle-btn.active{
+  background: var(--blue);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(37,99,235,.3);
+}
+.toggle-btn:hover:not(.active){ background: rgba(0,0,0,.04); color: var(--ink-2); }
+
+.map-info{
+  padding: 8px 20px;
+  background: #f0f9ff;
+  border-bottom: 1px solid #bae6fd;
+  font-size: 12.5px;
+  color: #075985;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.map-body{ position: relative; }
+#map{ height: 620px; }
+#loading{
+  position: absolute; inset: 0;
+  background: rgba(248,250,252,.96);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  gap: 12px;
+}
+#loading p{ font-size: 14px; color: var(--ink-3); }
+.spinner{
+  width: 36px; height: 36px;
+  border: 3px solid #e2e8f0;
+  border-top-color: var(--blue);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin{ to{ transform:rotate(360deg) } }
+
+.zoom-hint{
+  position: absolute;
+  bottom: 20px; left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15,23,42,.7);
+  color: #fff;
+  font-size: 12px;
+  padding: 6px 16px;
+  border-radius: 20px;
+  z-index: 999;
+  pointer-events: none;
+  transition: opacity .4s;
+  white-space: nowrap;
+  backdrop-filter: blur(4px);
+}
+
+/* MAP LEGEND */
+.map-legend{
+  position: absolute;
+  top: 14px; right: 14px;
+  background: rgba(255,255,255,.97);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: var(--sh-md);
+  padding: 14px 16px;
+  z-index: 1000;
+  min-width: 175px;
+}
+.leg-title{
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  margin-bottom: 10px;
+}
+.leg-row{ display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-size: 12px; color: var(--ink-2); }
+.leg-swatch{ width: 20px; height: 12px; border-radius: 3px; flex-shrink: 0; border: 1px solid rgba(0,0,0,.06); }
+.leg-sep{ border: none; border-top: 1px solid var(--border); margin: 8px 0; }
+
+/* MAP SIDEBAR */
+.map-sidebar{
+  position: absolute;
+  top: 14px; left: 14px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: var(--sh-lg);
+  padding: 20px;
+  z-index: 1000;
+  width: 275px;
+  transform: translateX(calc(-100% - 20px));
+  transition: transform .28s cubic-bezier(.16,1,.3,1);
+  pointer-events: none;
+}
+.map-sidebar.open{ transform: translateX(0); pointer-events: auto; }
+.sb-head{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.sb-head h3{ font-size: 17px; font-weight: 700; color: var(--ink-1); }
+.sb-close{
+  cursor: pointer;
+  color: var(--ink-4);
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 2px;
+  transition: color .15s;
+}
+.sb-close:hover{ color: var(--ink-1); }
+.sb-metrics{
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.sb-m{ background: var(--surface); border-radius: 8px; padding: 10px 8px; text-align: center; }
+.sb-m-num{ font-size: 18px; font-weight: 700; color: var(--orange); line-height: 1; }
+.sb-m-lbl{ font-size: 10.5px; color: var(--ink-3); margin-top: 3px; }
+.sb-den{
+  background: var(--blue-lt);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 12.5px;
+  color: #1e40af;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.sb-den b{ font-size: 16px; font-weight: 700; }
+.sb-divider{ border: none; border-top: 1px solid var(--border); margin: 12px 0 10px; }
+.sb-zone-lbl{
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-4);
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  margin-bottom: 8px;
+}
+.sb-zone-row{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background .12s;
+  margin-bottom: 4px;
+}
+.sb-zone-row:hover{ background: var(--blue-lt); }
+.sb-zone-dot{ width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.sb-zone-name{ font-size: 13px; font-weight: 600; color: var(--ink-1); flex: 1; }
+.sb-zone-num{ font-size: 11px; color: var(--ink-3); }
+.sb-zone-bar-bg{ width: 48px; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; flex-shrink: 0; }
+.sb-zone-bar{ height: 100%; background: linear-gradient(90deg,#f97316,#ea580c); border-radius: 2px; }
+
+/* MAP TOOLTIP */
+.map-tip{ background:rgba(15,23,42,.92)!important; border:none!important; border-radius:10px!important; color:#f1f5f9!important; font-size:13px!important; padding:10px 14px!important; box-shadow:0 4px 20px rgba(0,0,0,.35)!important; pointer-events:none!important; white-space:nowrap }
+.map-tip b{ font-size:15px; display:block; margin-bottom:5px }
+.tip-val{ color:#fb923c; font-size:17px; font-weight:700 }
+.tip-sub{ color:#94a3b8; font-size:12px }
+.tip-den{ font-size:13px; margin-top:5px; padding-top:5px; border-top:1px solid rgba(255,255,255,.12); color:#7dd3fc }
+.leaflet-tooltip-bottom.map-tip::before,.leaflet-tooltip-top.map-tip::before{ display:none!important }
+
+/* ─── ANALYSIS SECTION ────────────────────────────── */
+.insight-list{ padding: 8px 0; }
+
+.insight-item{ border-top: 1px solid var(--border); }
+.insight-head{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 28px;
+  cursor: pointer;
+  transition: background .12s;
+  user-select: none;
+}
+.insight-head:hover{ background: var(--surface); }
+.insight-tag{
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 12px;
+  flex-shrink: 0;
+  letter-spacing: .1px;
+}
+.it-red   { background: #dc2626; color: #fff; }
+.it-blue  { background: var(--blue); color: #fff; }
+.it-amber { background: #d97706; color: #fff; }
+.it-green { background: #16a34a; color: #fff; }
+.it-slate { background: #475569; color: #fff; }
+.insight-text{ flex: 1; min-width: 0; }
+.insight-title{ font-size: 14px; font-weight: 600; color: var(--ink-1); }
+.insight-preview{
+  font-size: 12.5px;
+  color: var(--ink-3);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 560px;
+}
+.insight-item.open .insight-preview{ display: none; }
+.insight-chevron{
+  color: var(--ink-4);
+  font-size: 12px;
+  flex-shrink: 0;
+  transition: transform .2s;
+}
+.insight-item.open .insight-chevron{ transform: rotate(90deg); }
+
+.insight-body{
+  display: none;
+  padding: 4px 28px 22px 28px;
+}
+.insight-item.open .insight-body{ display: block; }
+.insight-body p{
+  font-size: 13.5px;
+  color: var(--ink-2);
+  line-height: 1.85;
+  margin-bottom: 14px;
+}
+.insight-action{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--blue);
+  cursor: pointer;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--blue-bd);
+  background: var(--blue-lt);
+  transition: all .15s;
+}
+.insight-action:hover{ background: #dbeafe; box-shadow: 0 1px 3px rgba(37,99,235,.15); }
+
+/* ─── STRATEGY CALLOUT ────────────────────────────── */
+.strategy-callout{
+  margin: 6px 28px 28px;
+  background: var(--blue-lt);
+  border: 1px solid var(--blue-bd);
+  border-left: 4px solid var(--blue);
+  border-radius: var(--r);
+  padding: 20px 24px;
+}
+.strategy-label{
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--blue);
+  margin-bottom: 6px;
+}
+.strategy-head{
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-1);
+  margin-bottom: 16px;
+}
+.strategy-grid{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 28px;
+}
+.strategy-item{
+  font-size: 13px;
+  color: var(--ink-2);
+  line-height: 1.8;
+}
+.strategy-item strong{ color: var(--ink-1); }
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ════════════════════════════════════════════════ -->
+<!--  SECTION 1 · CITY PROFILE                       -->
+<!-- ════════════════════════════════════════════════ -->
+<section class="card">
+  <div class="sec-head">
+    <div>
+      <div class="sec-title">合肥市就业市场画像</div>
+      <div class="sec-desc">制造业立市的千万人口新兴城市，以新能源汽车、集成电路、人工智能为核心支柱，工厂操作工与技术研发并重，是安徽乃至中部增速最快的用工市场之一。</div>
+    </div>
+    <nav class="tab-group">
+      <button class="tab-btn active" data-tab="overview"     onclick="switchTab('overview')">城市概况</button>
+      <button class="tab-btn"        data-tab="enterprises"  onclick="switchTab('enterprises')">龙头企业 TOP10</button>
+      <button class="tab-btn"        data-tab="economy"      onclick="switchTab('economy')">GDP · 人口</button>
+      <button class="tab-btn"        data-tab="zones"        onclick="switchTab('zones')">区域速览</button>
+      <button class="tab-btn"        data-tab="policy"       onclick="switchTab('policy')">政策环境</button>
+    </nav>
+    <span class="sec-meta">数据来源：国家统计局 · 合肥市统计局 · 2025年</span>
+  </div>
+
+  <!-- TAB: 城市概况 -->
+  <div class="tab-pane active" id="tab-overview">
+    <div class="kpi-strip">
+      <div class="kpi-card">
+        <div class="kpi-card-label">2025年 GDP</div>
+        <div class="kpi-card-val">1.42<span class="kpi-card-unit"> 万亿</span></div>
+        <div class="kpi-card-note">全国城市前 20</div>
+        <div class="kpi-card-insight">经济体量支撑持续用工需求，市场规模可观</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-card-label">常住人口</div>
+        <div class="kpi-card-val">1000.5<span class="kpi-card-unit"> 万</span></div>
+        <div class="kpi-card-note">跨入千万人口城市行列</div>
+        <div class="kpi-card-insight">劳动力供给充足，求职者基数大，C 端市场有厚度</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-card-label">在校大学生</div>
+        <div class="kpi-card-val">84<span class="kpi-card-unit"> 万</span></div>
+        <div class="kpi-card-note">55 所高校（含研究生）</div>
+        <div class="kpi-card-insight">白领岗位候选人基数大，校招与应届生业务空间可观</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-card-label">应届生留肥率</div>
+        <div class="kpi-card-val">41.3<span class="kpi-card-unit"> %</span></div>
+        <div class="kpi-card-note">新招引大学生 35.6 万人</div>
+        <div class="kpi-card-insight">超半数外流，本地人才供给紧，企业对招聘平台依赖度高</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-card-label">工商注册经营主体</div>
+        <div class="kpi-card-val">183.3<span class="kpi-card-unit"> 万户</span></div>
+        <div class="kpi-card-note">规上企业 12,664 家｜同比 +8.2%</div>
+        <div class="kpi-card-insight">B 端目标客户池巨大，中小微企业为主体，BD 空间充足</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-card-label">GDP 增速</div>
+        <div class="kpi-card-val">+6.1<span class="kpi-card-unit"> %</span></div>
+        <div class="kpi-card-note">万亿城市 TOP2 增速</div>
+        <div class="kpi-card-insight">持续扩张期，新企业不断涌入，招聘需求活跃</div>
+      </div>
+    </div>
+    <div class="ind-grid">
+      <div class="ind-card nev">
+        <div class="ind-icon">🚗</div>
+        <div>
+          <div class="ind-name">新能源汽车</div>
+          <div class="ind-note">蔚来（总部·独立造车）·比亚迪（长丰基地）·江淮（华为尊界）<br>2025 年新能源整车产量约 137 万辆</div>
+          <span class="ind-badge">全国城市前三</span>
+        </div>
+      </div>
+      <div class="ind-card ic">
+        <div class="ind-icon">💾</div>
+        <div>
+          <div class="ind-name">集成电路</div>
+          <div class="ind-note">长鑫存储：中国唯一量产内存芯片（DRAM）企业<br>半导体产业链持续成型</div>
+          <span class="ind-badge">中国存储芯片核心基地</span>
+        </div>
+      </div>
+      <div class="ind-card disp">
+        <div class="ind-icon">📺</div>
+        <div>
+          <div class="ind-name">新型显示</div>
+          <div class="ind-note">京东方全球最大 10.5 代线<br>全国显示面板重要基地</div>
+          <span class="ind-badge">全球产能前三</span>
+        </div>
+      </div>
+      <div class="ind-card ai">
+        <div class="ind-icon">🤖</div>
+        <div>
+          <div class="ind-name">人工智能</div>
+          <div class="ind-note">科大讯飞全球语音 AI 龙头<br>国家新一代 AI 示范区</div>
+          <span class="ind-badge">国家 AI 示范区</span>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:20px;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:28px;flex-wrap:wrap">
+      <div style="font-size:11px;font-weight:700;color:var(--ink-4);text-transform:uppercase;letter-spacing:.5px;flex-shrink:0">2025年产业结构</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div style="width:10px;height:10px;border-radius:2px;background:#22c55e;flex-shrink:0"></div>
+        <span style="font-size:12.5px;color:var(--ink-2)">第一产业（农业）</span>
+        <strong style="font-size:14px;color:var(--ink-1);margin-left:4px">2.4%</strong>
+        <span style="font-size:11px;color:var(--ink-4);margin-left:2px">338亿</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div style="width:10px;height:10px;border-radius:2px;background:#3b82f6;flex-shrink:0"></div>
+        <span style="font-size:12.5px;color:var(--ink-2)">第二产业（工业/制造）</span>
+        <strong style="font-size:14px;color:var(--ink-1);margin-left:4px">36.7%</strong>
+        <span style="font-size:11px;color:var(--ink-4);margin-left:2px">5,222亿 · 增速+8.7%</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div style="width:10px;height:10px;border-radius:2px;background:#a855f7;flex-shrink:0"></div>
+        <span style="font-size:12.5px;color:var(--ink-2)">第三产业（服务业）</span>
+        <strong style="font-size:14px;color:var(--ink-1);margin-left:4px">60.9%</strong>
+        <span style="font-size:11px;color:var(--ink-4);margin-left:2px">8,650亿</span>
+      </div>
+      <div style="font-size:11.5px;color:var(--blue);margin-left:auto">制造业增速+8.7%，规上工业增速+17.6%，居万亿城市第一</div>
+    </div>
+  </div>
+
+  <!-- TAB: 龙头企业 -->
+  <div class="tab-pane" id="tab-enterprises">
+    <p style="font-size:11px;font-weight:600;color:var(--ink-4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">
+      🏆 合肥龙头企业 TOP10 &nbsp;·&nbsp; <span style="text-transform:none;font-weight:400">点击行在地图中定位</span>
+    </p>
+    <table class="ent-tbl">
+      <thead>
+        <tr><th>#</th><th>企业</th><th>主业</th><th>所在区域</th><th>员工规模</th><th>招聘特点</th></tr>
+      </thead>
+      <tbody id="ent-tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- TAB: GDP人口 -->
+  <div class="tab-pane" id="tab-economy">
+    <p style="font-size:11px;font-weight:600;color:var(--ink-4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px">
+      📊 各区 GDP · 常住人口 &nbsp;·&nbsp; <span style="text-transform:none;font-weight:400">2025 年数据（部分县区为估算）· 经开/高新/新站各功能区单独核算，未计入所属行政区 · 点击跳转地图</span>
+    </p>
+    <div id="econ-bars"></div>
+  </div>
+
+  <!-- TAB: 区域速览 -->
+  <div class="tab-pane" id="tab-zones">
+    <div class="zone-note">
+      <strong>📍 区域层级说明：</strong>合肥存在"行政区划"与"功能开发区"两套叫法，同一片区常被混用。
+      <strong>经开区</strong>、<strong>滨湖新区</strong> 地理上隶属<strong>包河区</strong> ·
+      <strong>高新区</strong>、<strong>政务区</strong> 隶属<strong>蜀山区</strong> ·
+      <strong>新站区</strong> 隶属<strong>瑶海区</strong> ·
+      <strong>北城新区</strong> 隶属<strong>庐阳区</strong>。
+      热力图底色 = 官方行政边界；缩放 ≥11 出现的圆点 = 58 平台子区域。
+      <br><strong>⚠️ 注意：</strong>经开区、高新区、新站区在统计上<strong>单独核算 GDP</strong>，不并入所属行政区，因此各行政区柱状图数据不含其辖内功能区的经济产出，实际经济体量会更大。
+    </div>
+
+    <div style="margin:16px 0 20px;overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+        <thead>
+          <tr style="background:var(--surface);border-bottom:2px solid var(--border)">
+            <th style="padding:9px 14px;text-align:left;color:var(--ink-4);font-weight:600;letter-spacing:.4px;text-transform:uppercase;font-size:11px">开发区</th>
+            <th style="padding:9px 14px;text-align:left;color:var(--ink-4);font-weight:600;letter-spacing:.4px;text-transform:uppercase;font-size:11px">核心定位</th>
+            <th style="padding:9px 14px;text-align:left;color:var(--ink-4);font-weight:600;letter-spacing:.4px;text-transform:uppercase;font-size:11px">主要招的是谁</th>
+            <th style="padding:9px 14px;text-align:left;color:var(--ink-4);font-weight:600;letter-spacing:.4px;text-transform:uppercase;font-size:11px">代表企业</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:10px 14px;font-weight:700;color:var(--ink-1)">经开区<br><span style="font-weight:400;font-size:11px;color:var(--ink-4)">↪ 包河区</span></td>
+            <td style="padding:10px 14px;color:var(--ink-2)">汽车制造基地</td>
+            <td style="padding:10px 14px;color:var(--ink-2)">蓝领操作工、技工</td>
+            <td style="padding:10px 14px;color:var(--ink-3);font-size:12px">联宝·蔚来·江淮·国轩</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:10px 14px;font-weight:700;color:var(--ink-1)">新站区<br><span style="font-weight:400;font-size:11px;color:var(--ink-4)">↪ 瑶海区</span></td>
+            <td style="padding:10px 14px;color:var(--ink-2)">高端制造（芯片/面板）</td>
+            <td style="padding:10px 14px;color:var(--ink-2)">洁净室技工 + 工程师</td>
+            <td style="padding:10px 14px;color:var(--ink-3);font-size:12px">京东方·长鑫存储</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 14px;font-weight:700;color:var(--ink-1)">高新区<br><span style="font-weight:400;font-size:11px;color:var(--ink-4)">↪ 蜀山区</span></td>
+            <td style="padding:10px 14px;color:var(--ink-2)">硬科技研发园区</td>
+            <td style="padding:10px 14px;color:var(--ink-2)">研发工程师、技术白领</td>
+            <td style="padding:10px 14px;color:var(--ink-3);font-size:12px">科大讯飞·阳光电源·通威</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="zone-grid">
+      <div class="zone-card">
+        <div class="zc-top"><span class="zc-name">经开区</span><span class="zc-parent">↪ 包河区</span></div>
+        <span class="zc-badge zcb-hot">⭐ 58 攻坚首选</span>
+        <div class="zc-items">
+          <div class="zc-item">🚗 新能源汽车制造核心</div>
+          <div class="zc-item">🔗 联宝·蔚来·江淮·国轩</div>
+          <div class="zc-item">🏭 Tier2-3 配套企业聚集地</div>
+        </div>
+        <div class="zc-footer">58 在招：1,877 家唯一企业</div>
+      </div>
+      <div class="zone-card">
+        <div class="zc-top"><span class="zc-name">新站区</span><span class="zc-parent">↪ 瑶海区</span></div>
+        <span class="zc-badge zcb-hot">⭐ 增量重点</span>
+        <div class="zc-items">
+          <div class="zc-item">📺 显示面板·集成电路</div>
+          <div class="zc-item">🔗 京东方·长鑫存储</div>
+          <div class="zc-item">🎓 职教城（职校生 C 端聚集）</div>
+        </div>
+        <div class="zc-footer">58 在招：1,402 家唯一企业</div>
+      </div>
+      <div class="zone-card">
+        <div class="zc-top"><span class="zc-name">高新区</span><span class="zc-parent">↪ 蜀山区</span></div>
+        <span class="zc-badge zcb-norm">国家级开发区</span>
+        <div class="zc-items">
+          <div class="zc-item">🤖 AI·光伏·科技创新</div>
+          <div class="zc-item">🔗 科大讯飞·阳光电源·通威</div>
+          <div class="zc-item">👔 白领技术岗为主</div>
+        </div>
+        <div class="zc-footer">58 在招：1,621 家唯一企业</div>
+      </div>
+      <div class="zone-card">
+        <div class="zc-top"><span class="zc-name">庐阳区</span><span class="zc-parent">独立行政区</span></div>
+        <span class="zc-badge zcb-norm">传统商业核心</span>
+        <div class="zc-items">
+          <div class="zc-item">🏬 四牌楼·淮河路老商圈</div>
+          <div class="zc-item">🏢 写字楼·金融·零售集中</div>
+          <div class="zc-item">📏 密度全市第二（12.1/km²）</div>
+        </div>
+        <div class="zc-footer">58 在招：1,655 家唯一企业</div>
+      </div>
+      <div class="zone-card">
+        <div class="zc-top"><span class="zc-name">蜀山区</span><span class="zc-parent">含高新区+政务区</span></div>
+        <span class="zc-badge zcb-norm">合肥面积最大城区</span>
+        <div class="zc-items">
+          <div class="zc-item">🎓 合工大·安大·高校密集</div>
+          <div class="zc-item">🏘 生活服务·教育·科研</div>
+          <div class="zc-item">⚠️ 面积大导致密度偏低（6.7/km²）</div>
+        </div>
+        <div class="zc-footer">58 在招：4,434 家（全市第一）</div>
+      </div>
+      <div class="zone-card">
+        <div class="zc-top"><span class="zc-name">包河区</span><span class="zc-parent">含经开区+滨湖新区</span></div>
+        <span class="zc-badge zcb-norm">企业密度全市最高</span>
+        <div class="zc-items">
+          <div class="zc-item">🏙 骆岗·滨湖，城市南部核心</div>
+          <div class="zc-item">💼 商务会展·制造双轮驱动</div>
+          <div class="zc-item">📏 密度第一（14.2 家/km²）</div>
+        </div>
+        <div class="zc-footer">58 在招：4,412 家唯一企业</div>
+      </div>
+      <div class="zone-card">
+        <div class="zc-top"><span class="zc-name">瑶海区</span><span class="zc-parent">含新站区</span></div>
+        <span class="zc-badge zcb-norm">老工业区转型中</span>
+        <div class="zc-items">
+          <div class="zc-item">🏗 合力叉车·工程机械重镇</div>
+          <div class="zc-item">🪑 家居建材·物流集散枢纽</div>
+          <div class="zc-item">🔄 传统制造向高端制造升级</div>
+        </div>
+        <div class="zc-footer">58 在招：2,655 家唯一企业</div>
+      </div>
+      <div class="zone-card">
+        <div class="zc-top"><span class="zc-name">滨湖新区</span><span class="zc-parent">↪ 包河区</span></div>
+        <span class="zc-badge zcb-norm">城市新中心</span>
+        <div class="zc-items">
+          <div class="zc-item">🏛 安徽省政府·行政办公中心</div>
+          <div class="zc-item">💰 金融街·高端商住配套</div>
+          <div class="zc-item">🆕 规划最新，密度持续增长</div>
+        </div>
+        <div class="zc-footer">58 在招：1,102 家唯一企业</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: 政策环境 -->
+  <div class="tab-pane" id="tab-policy">
+    <p style="font-size:11px;font-weight:600;color:var(--ink-4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px">
+      🏛️ 合肥人才引进与就业扶持政策 &nbsp;·&nbsp; <span style="text-transform:none;font-weight:400">数据来源：合肥市人社局 · 2025年</span>
+    </p>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px">
+        <div style="font-size:11px;font-weight:700;color:var(--ink-4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🏠 住房租赁补贴</div>
+        <div style="font-size:12.5px;color:var(--ink-2);line-height:2">
+          博士 &nbsp;<strong style="color:var(--ink-1)">3.6万元/年</strong><br>
+          硕士 &nbsp;<strong style="color:var(--ink-1)">2万元/年</strong><br>
+          本科 &nbsp;<strong style="color:var(--ink-1)">1.5万元/年</strong><br>
+          大专 &nbsp;<strong style="color:var(--ink-1)">0.6万元/年</strong>
+        </div>
+        <div style="font-size:11px;color:var(--ink-4);margin-top:8px">累计发放最长 36 个月 · 35岁以下毕业生适用</div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px">
+        <div style="font-size:11px;font-weight:700;color:var(--ink-4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🏡 购房补贴（高层次人才）</div>
+        <div style="font-size:12.5px;color:var(--ink-2);line-height:2">
+          A 类人才 &nbsp;<strong style="color:var(--ink-1)">最高 200万</strong><br>
+          B 类人才 &nbsp;<strong style="color:var(--ink-1)">最高 110万</strong><br>
+          C 类人才 &nbsp;<strong style="color:var(--ink-1)">最高 90万</strong><br>
+          博士生 &nbsp;<strong style="color:var(--ink-1)">最高 12万</strong>
+        </div>
+        <div style="font-size:11px;color:var(--ink-4);margin-top:8px">在肥连续工作满 1 年 · 首套自住住房 · 分5年拨付</div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px">
+        <div style="font-size:11px;font-weight:700;color:var(--ink-4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🚀 创业与就业扶持</div>
+        <div style="font-size:12.5px;color:var(--ink-2);line-height:2">
+          创业天使基金 &nbsp;<strong style="color:var(--ink-1)">最高 1000万</strong><br>
+          柔性引才补贴 &nbsp;<strong style="color:var(--ink-1)">最高 100万/人/年</strong><br>
+          就业创业补贴 &nbsp;<strong style="color:var(--ink-1)">4.24亿元（2025年）</strong><br>
+          稳岗贷/乐业贷 &nbsp;<strong style="color:var(--ink-1)">9.1亿元（2025年）</strong>
+        </div>
+        <div style="font-size:11px;color:var(--ink-4);margin-top:8px">惠及 147.56 万人次</div>
+      </div>
+    </div>
+    <div style="padding:12px 16px;background:#eff6ff;border-radius:8px;border:1px solid #bfdbfe;font-size:12.5px;color:#1e40af;line-height:1.7">
+      <strong>政策对招聘的意义：</strong>合肥对大学生的租房补贴覆盖范围广（大专及以上均适用），直接降低外来务工者的生活成本，支撑了合肥人口持续流入的趋势。对企业招聘方来说，可在 JD 中主动标注"合肥人才补贴可申请"，提升对外地候选人的吸引力。
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════ -->
+<!--  SECTION 2 · RANKING TABLE                      -->
+<!-- ════════════════════════════════════════════════ -->
+<section class="card">
+  <div class="sec-head">
+    <div>
+      <div class="sec-title">各行政区企业覆盖排名</div>
+      <div class="sec-sub">按唯一在招企业数降序排列 · 点击任意行在地图中定位</div>
+    </div>
+  </div>
+  <div class="rank-tbl-wrap">
+    <table class="rank-tbl" id="rank-table">
+      <thead>
+        <tr>
+          <th>排名</th>
+          <th>行政区划</th>
+          <th>唯一企业数</th>
+          <th>在架职位</th>
+          <th>企业密度（家/km²）</th>
+          <th>覆盖评级</th>
+        </tr>
+      </thead>
+      <tbody id="table-body"></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════ -->
+<!--  SECTION 3+4 · MAP                              -->
+<!-- ════════════════════════════════════════════════ -->
+<section class="card map-card">
+  <div class="map-toolbar">
+    <div class="map-toolbar-title">
+      <div class="map-title">合肥市企业覆盖热力图</div>
+      <div class="map-sub">唯一在招企业数 · 双视图切换 · 点击区块定位</div>
+    </div>
+    <div class="map-kpis">
+      <div class="mk-item">
+        <div><span class="mk-num">12,050</span></div>
+        <div class="mk-lbl">唯一在招企业</div>
+      </div>
+      <div class="mk-item">
+        <div><span class="mk-num">38,454</span></div>
+        <div class="mk-lbl">在架职位总数</div>
+      </div>
+      <div class="mk-item">
+        <div><span class="mk-num">14.2</span><span class="mk-unit"> / 0.07</span></div>
+        <div class="mk-lbl">最高 / 最低密度（家/km²）</div>
+      </div>
+    </div>
+    <div class="map-toggle">
+      <button class="toggle-btn active" id="btn-abs" onclick="switchMetric('abs')">企业总量</button>
+      <button class="toggle-btn" id="btn-den" onclick="switchMetric('den')">企业密度（家/km²）</button>
+    </div>
+  </div>
+  <div class="map-info">
+    ⓘ <strong>颜色深浅 = 在招企业密集度。</strong>对求职者而言：企业越多越分散，随机走到哪里遇到招聘的概率越高。
+  </div>
+  <div class="map-body">
+    <div id="loading"><div class="spinner"></div><p>正在加载合肥行政区划边界…</p></div>
+    <div id="map"></div>
+    <div class="map-legend" id="legend"></div>
+    <div class="map-sidebar" id="sidebar">
+      <div class="sb-head">
+        <h3 id="sb-name"></h3>
+        <span class="sb-close" onclick="closeSidebar()">×</span>
+      </div>
+      <div class="sb-metrics">
+        <div class="sb-m"><div class="sb-m-num" id="sb-etps">0</div><div class="sb-m-lbl">唯一企业</div></div>
+        <div class="sb-m"><div class="sb-m-num" id="sb-jobs">0</div><div class="sb-m-lbl">在架职位</div></div>
+        <div class="sb-m"><div class="sb-m-num" id="sb-area">0</div><div class="sb-m-lbl">面积km²</div></div>
+      </div>
+      <div class="sb-den" id="sb-density-row">
+        📍 企业密度：<b id="sb-den-val">0</b> 家/km²
+      </div>
+      <hr class="sb-divider"/>
+      <div class="sb-zone-lbl">子区域分布</div>
+      <div id="sb-zones"></div>
+    </div>
+    <div class="zoom-hint" id="zoom-hint">🔍 滚轮缩放 ≥11 显示 58 子区域，≥12.5 显示三级地域</div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════ -->
+<!--  SECTION 5 · ANALYSIS                           -->
+<!-- ════════════════════════════════════════════════ -->
+<section class="card">
+  <div class="sec-head">
+    <div>
+      <div class="sec-title">深度洞察 · 策略建议</div>
+      <div class="sec-sub">点击任意洞察展开详情，展开后可一键定位地图</div>
+    </div>
+  </div>
+
+  <div class="insight-list">
+    <div class="insight-item" data-id="a1">
+      <div class="insight-head" onclick="toggleAccord('a1')">
+        <span class="insight-tag it-red">攻坚首选</span>
+        <div class="insight-text">
+          <div class="insight-title">🏭 经开区 · 联宝/蔚来配套企业集群 · 时机最佳</div>
+          <div class="insight-preview">四大锚点工厂周边聚集数百家50–300人配套企业，直接在58发职位，招聘渠道尚未固化…</div>
+        </div>
+        <span class="insight-chevron">▶</span>
+      </div>
+      <div class="insight-body">
+        <p>联宝/蔚来/江淮/国轩四大锚点工厂周边，聚集数百家 <strong>50–300人规模的配套企业</strong>（冲压件、注塑、线束、物流）。大厂靠劳务派遣，但这些中小配套<strong>直接在58发职位</strong>，是可立即触达的B端目标。2022年起新能源配套企业持续新落户，<strong>招聘渠道尚未固化，现在介入时机最佳。</strong></p>
+        <button class="insight-action" onclick="cardFly('包河区')">在地图中定位 →</button>
+      </div>
+    </div>
+
+    <div class="insight-item" data-id="a2">
+      <div class="insight-head" onclick="toggleAccord('a2')">
+        <span class="insight-tag it-blue">增量市场</span>
+        <div class="insight-text">
+          <div class="insight-title">🌱 新站区 · 高端制造 × 职教城 C 端入口</div>
+          <div class="insight-preview">京东方+长鑫两大巨厂坐镇，但58仅覆盖1,402家企业，配套中小企业明显挂牌不足；职教城职校生是58原生C端…</div>
+        </div>
+        <span class="insight-chevron">▶</span>
+      </div>
+      <div class="insight-body">
+        <p>新站区有京东方、长鑫存储两大制造业锚点，直接用工合计数万人，周边应有大量配套企业——但58上新站仅有 <strong>1,402家</strong>在招企业，远少于经开区（1,877家）。两大巨厂自建 HR 体系、不直接在58发招，但其周边 <strong>50–200人规模的配套商</strong>（精密零件、后勤服务、洁净耗材）才是可触达的 B 端。<strong>长鑫 295亿募资扩产</strong>后，配套需求将持续爆发，现在是介入时机。</p>
+        <p><strong>职教城板块</strong>（陶冲湖片区）的独特价值：职校生通过<strong>自主找工作</strong>而非等学校统一分配，是58的原生 C 端用户，抖音/小红书职场内容在这里有真实转化场景。陶冲湖片区已是全市最大单板块（<strong>380家</strong>），C 端基础已验证。</p>
+        <button class="insight-action" onclick="cardFly('瑶海区')">在地图中定位 →</button>
+      </div>
+    </div>
+
+    <div class="insight-item" data-id="a3">
+      <div class="insight-head" onclick="toggleAccord('a3')">
+        <span class="insight-tag it-amber">C 端运营</span>
+        <div class="insight-text">
+          <div class="insight-title">📏 密度是求职体验真实标尺 · 影响 C 端投放优先级</div>
+          <div class="insight-preview">包河/庐阳密度12-14家/km²，高新区仅约8家/km²；同等C端投放预算，密集区转化效率更高…</div>
+        </div>
+        <span class="insight-chevron">▶</span>
+      </div>
+      <div class="insight-body">
+        <p>企业密度直接影响 C 端求职体验——打开 App 能不能在附近找到在招职位。包河区密度 <strong>14.2家/km²</strong>、庐阳 <strong>12.1</strong>、高新区约 <strong>8家/km²</strong>（企业集中在几个园区，周边大量面积为校园和绿地）。<strong>C端运营和广告投放</strong>优先包河/庐阳/瑶海三区城区：求职者随机走动遇到在招企业概率最高，同等预算的 DAU→投递转化效率更高。高新区面积大但企业聚集在局部园区，不适合大面积 C 端铺量，更适合针对园区定向触达。</p>
+        <button class="insight-action" onclick="cardFly('包河区')">在地图中定位 →</button>
+      </div>
+    </div>
+
+    <div class="insight-item" data-id="a4">
+      <div class="insight-head" onclick="toggleAccord('a4')">
+        <span class="insight-tag it-green">地推效率</span>
+        <div class="insight-text">
+          <div class="insight-title">🗺️ 企业高度集中在少数热点 · 地推可精准到街道</div>
+          <div class="insight-preview">经开莲花路680家、新站陶冲湖380家、瑶海元一广场239家，少数地标承载全区60–70%企业…</div>
+        </div>
+        <span class="insight-chevron">▶</span>
+      </div>
+      <div class="insight-body">
+        <p>企业并非均匀分布：经开 <strong>莲花路680家</strong>、新站 <strong>陶冲湖380家</strong>、瑶海 <strong>元一广场239家</strong>——少数商圈/地标承载了全区60–70%的在招企业。<strong>地推和品牌活动不需铺满整区</strong>，定点覆盖这些核心地标即可高效触达B端和C端，大幅降低单次覆盖成本。</p>
+        <button class="insight-action" onclick="cardFly('包河区')">在地图中定位 →</button>
+      </div>
+    </div>
+
+    <div class="insight-item" data-id="a7">
+      <div class="insight-head" onclick="toggleAccord('a7')">
+        <span class="insight-tag it-red">竞争预警</span>
+        <div class="insight-text">
+          <div class="insight-title">⚔️ Boss直聘正在主攻蓝领市场 · 窗口期比预期更短</div>
+          <div class="insight-preview">Boss全国市场份额35%，2025年推出"海螺优选"蓝领计划+"地图找工作"，日服务百万级蓝领，直接对标我们核心场景…</div>
+        </div>
+        <span class="insight-chevron">▶</span>
+      </div>
+      <div class="insight-body">
+        <p>在线招聘市场格局：<strong>Boss直聘 35%</strong> > 智联招聘 20% > 前程无忧 15% > 猎聘 10%，头部效应持续加剧，中小平台生存空间被压缩。Boss原本以白领/中小企业见长，但 2025 年开始明确布局蓝领：推出<strong>「海螺优选」蓝领计划</strong>（严格职位审核 + 蓝领专区），上线<strong>「地图找工作」</strong>功能日服务百万级蓝领求职者，并推出「极速约面」将面试流程缩短至秒级——这些功能直接对标58的核心使用场景。</p>
+        <p><strong>对我们的具体威胁：</strong>Boss的全国品牌溢出效应 + 更大的用户基数，进入合肥蓝领市场的边际成本极低。一旦合肥经开区/新站区的配套企业被Boss率先转化，后续争夺成本将成倍上升。<strong>时间窗口比我们预期的更短。</strong></p>
+        <p><strong>应对方向：</strong>本地化深度（地推、本地BD关系）和垂直制造业服务能力是58在蓝领场景的差异化壁垒——Boss是全国平台，本地服务响应慢、对合肥制造业生态理解浅；这是我们的窗口，但必须在Boss完成本地化之前跑出规模。</p>
+        <button class="insight-action" onclick="cardFly('包河区')">在地图中定位经开区 →</button>
+      </div>
+    </div>
+
+    <div class="insight-item" data-id="a6">
+      <div class="insight-head" onclick="toggleAccord('a6')">
+        <span class="insight-tag it-slate">暂缓区域</span>
+        <div class="insight-text">
+          <div class="insight-title">🗂️ 庐江县 · 巢湖市 · 为何暂不列入攻坚范围</div>
+          <div class="insight-preview">两县合计仅321家在架企业，距市区60–80km，经济结构以矿产化工和旅游农业为主，ROI 远低于主城区…</div>
+        </div>
+        <span class="insight-chevron">▶</span>
+      </div>
+      <div class="insight-body">
+        <p>庐江县在58在架唯一企业 <strong>184家</strong>、巢湖市 <strong>137家</strong>，两者合计 321家，不足经开区（1,877家）的 1/6。体量之外，结构问题更关键：</p>
+        <p><strong>庐江县</strong>以矿产开采、化工原料为主，这类企业用工走劳务队和老乡熟人网络，对线上招聘平台天然依赖度低；加之距合肥市区约 80km，是实质上独立的劳动力市场，合肥城区的求职者不会向此流动。<strong>巢湖市</strong>经济以环湖旅游、渔业为主，用工季节性强，不符合58常规招聘产品逻辑；距市区约 60km，同样自成一个小循环。</p>
+        <p><strong>核心判断：在庐江/巢湖投入资源开发 321家企业的 ROI，远低于在经开区继续深挖剩余潜力。</strong>不仅客户池小，企业依赖熟人渠道的惯性也让平台说服成本更高。当前阶段，这两个区域应维持自然覆盖（不主动放弃，但不投入专项资源）。待经开/新站打出规模、团队扩充后，可以极低的边际成本自然延展——届时品牌效应已形成，不需要从零开始地推。</p>
+        <button class="insight-action" onclick="cardFly('巢湖市')">在地图中定位 →</button>
+      </div>
+    </div>
+
+    <div class="insight-item" data-id="a5">
+      <div class="insight-head" onclick="toggleAccord('a5')">
+        <span class="insight-tag it-slate">数据质量</span>
+        <div class="insight-text">
+          <div class="insight-title">⚠️ 7.5% 职位位置缺失 · 直接损失 C 端自然曝光</div>
+          <div class="insight-preview">3,131个职位标记为"-"，在附近搜索场景完全隐身，是低成本高回报的补全机会…</div>
+        </div>
+        <span class="insight-chevron">▶</span>
+      </div>
+      <div class="insight-body">
+        <p>3,131个职位地域标记为"-"，在<strong>附近搜索</strong>场景中完全隐身，等于白发职位。<strong>B端运营的低成本高回报动作：</strong>引导企业补全工作地点字段，补全后可立即获得附近搜索流量。中小企业最容易忽略此字段，是运营介入的优先切入点。</p>
+        <button class="insight-action" onclick="cardFly('overview')">全览地图 →</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="strategy-callout">
+    <div class="strategy-label">策略说明</div>
+    <div class="strategy-head">🧭 为什么优先经开区 + 新站区？——三步推导</div>
+    <div class="strategy-grid">
+      <div class="strategy-item"><strong>第一步：明确58的核心价值在哪里发挥</strong><br>58 的价值是连接两类人：<strong>没有完整 HR 体系、靠外部平台招人的中小企业</strong>，和<strong>主动找工作、不依赖内推的蓝领/技工求职者</strong>。大厂有 HR 部门、有内部推荐体系，对平台依赖度低；白领岗位候选人更倾向 Boss直聘/猎聘。<strong>58 最能产生价值的场景，是制造业中小企业 + 流动性强的操作工/技工</strong>。</div>
+      <div class="strategy-item"><strong>第二步：合肥哪里最符合这个场景？</strong><br>合肥的制造业高度集中在两个区域：<strong>经开区</strong>（新能源汽车产业链，联宝/蔚来/江淮周边数百家 50–300 人配套企业）和<strong>新站区</strong>（京东方/长鑫存储的洁净室技工需求，叠加职教城职校生 C 端）。这两个区的企业画像和求职者画像，与58定位高度重合。高新区招的是研发工程师、技术白领，错位明显。</div>
+      <div class="strategy-item"><strong>第三步：为什么是现在？时机窗口</strong><br>经开区：2022年以来新能源配套企业持续落户，<strong>招聘渠道尚未固化</strong>，现在介入边际成本最低；新站区：长鑫存储 2026年 IPO 融资 295亿用于扩产，配套企业需求将集中爆发，<strong>先于竞争对手布局</strong>可锁定先发优势。错过这两个窗口，等渠道固化后再进入，BD 成本将成倍增加。</div>
+      <div class="strategy-item"><strong>高新区不是不做，是第二阶段</strong><br>高新区的战略价值在于：当合肥 C 端蓝领生态成熟、平台在本地有品牌认知度后，高新区企业的<strong>生产辅助岗、行政岗、销售岗</strong>会自然向58溢出——届时无需额外 BD，是平台扩张的自然延展。优先顺序是：先在定位最匹配的区域打出规模，再凭借口碑和品牌向上渗透，而非一开始就分散资源。</div>
+    </div>
+  </div>
+</section>
+
+</div><!-- #app -->
+
+<script>
+// =========== DATA ===========
+const TOTAL_ETPS = 12050;
+
+const officialData = {
+  '蜀山区': { etps:4434, jobs:10493, area_km2:664,  subzones:['蜀山','高新','政务'] },
+  '包河区': { etps:4412, jobs:11327, area_km2:310,  subzones:['包河','经开','滨湖新区'] },
+  '瑶海区': { etps:2655, jobs:6947,  area_km2:220,  subzones:['瑶海','新站'] },
+  '庐阳区': { etps:1655, jobs:3138,  area_km2:137,  subzones:['庐阳','北城新区'] },
+  '长丰县': { etps:830,  jobs:1595,  area_km2:2357, subzones:['长丰'] },
+  '肥东县': { etps:802,  jobs:2405,  area_km2:2130, subzones:['肥东'] },
+  '肥西县': { etps:783,  jobs:1928,  area_km2:1289, subzones:['肥西'] },
+  '庐江县': { etps:184,  jobs:395,   area_km2:2349, subzones:['庐江'] },
+  '巢湖市': { etps:137,  jobs:226,   area_km2:2046, subzones:['巢湖'] },
+};
+
+const zoneData = {
+  '蜀山':    { lat:31.756,lng:117.168,etps:2399,jobs:5755, parent:'蜀山区' },
+  '高新':    { lat:31.872,lng:117.140,etps:1621,jobs:2776, parent:'蜀山区' },
+  '政务':    { lat:31.838,lng:117.226,etps:1119,jobs:1962, parent:'蜀山区' },
+  '庐阳':    { lat:31.905,lng:117.255,etps:1619,jobs:3056, parent:'庐阳区' },
+  '北城新区':{ lat:31.960,lng:117.252,etps:49,  jobs:82,   parent:'庐阳区' },
+  '瑶海':    { lat:31.912,lng:117.375,etps:1702,jobs:4133, parent:'瑶海区' },
+  '新站':    { lat:31.918,lng:117.508,etps:1402,jobs:2814, parent:'瑶海区' },
+  '包河':    { lat:31.808,lng:117.362,etps:2291,jobs:4477, parent:'包河区' },
+  '经开':    { lat:31.712,lng:117.332,etps:1877,jobs:4816, parent:'包河区' },
+  '滨湖新区':{ lat:31.648,lng:117.335,etps:1102,jobs:2034, parent:'包河区' },
+  '肥东':    { lat:31.878,lng:117.655,etps:802, jobs:2405, parent:'肥东县' },
+  '肥西':    { lat:31.720,lng:117.008,etps:783, jobs:1928, parent:'肥西县' },
+  '长丰':    { lat:32.240,lng:117.170,etps:830, jobs:1595, parent:'长丰县' },
+  '庐江':    { lat:31.200,lng:117.290,etps:184, jobs:395,  parent:'庐江县' },
+  '巢湖':    { lat:31.618,lng:117.870,etps:137, jobs:226,  parent:'巢湖市' },
+};
+
+const subAreaData = [
+  {n:'莲花路',l2:'经开',etps:680,jobs:1470,lat:31.720,lng:117.305},
+  {n:'明珠广场',l2:'经开',etps:360,jobs:776,lat:31.736,lng:117.298},
+  {n:'大学城',l2:'经开',etps:142,jobs:304,lat:31.688,lng:117.310},
+  {n:'禹洲天玺',l2:'经开',etps:130,jobs:278,lat:31.728,lng:117.322},
+  {n:'翡翠湖',l2:'经开',etps:111,jobs:236,lat:31.742,lng:117.340},
+  {n:'芙蓉路',l2:'经开',etps:107,jobs:228,lat:31.710,lng:117.330},
+  {n:'港澳广场',l2:'经开',etps:98,jobs:208,lat:31.718,lng:117.290},
+  {n:'南艳湖',l2:'经开',etps:102,jobs:216,lat:31.696,lng:117.338},
+  {n:'蜀西湖',l2:'高新',etps:316,jobs:679,lat:31.858,lng:117.148},
+  {n:'客运西站',l2:'高新',etps:157,jobs:334,lat:31.876,lng:117.092},
+  {n:'香樟大道',l2:'高新',etps:147,jobs:313,lat:31.832,lng:117.168},
+  {n:'柏堰湖',l2:'高新',etps:143,jobs:304,lat:31.844,lng:117.136},
+  {n:'四季花海',l2:'高新',etps:134,jobs:284,lat:31.870,lng:117.156},
+  {n:'方兴大道',l2:'高新',etps:107,jobs:227,lat:31.852,lng:117.122},
+  {n:'黄潜望',l2:'蜀山',etps:266,jobs:573,lat:31.766,lng:117.164},
+  {n:'西园新村',l2:'蜀山',etps:162,jobs:346,lat:31.780,lng:117.178},
+  {n:'长江西路',l2:'蜀山',etps:161,jobs:345,lat:31.773,lng:117.172},
+  {n:'南七里',l2:'蜀山',etps:125,jobs:266,lat:31.757,lng:117.188},
+  {n:'轴承厂',l2:'蜀山',etps:118,jobs:252,lat:31.758,lng:117.165},
+  {n:'1912商业街',l2:'蜀山',etps:92,jobs:195,lat:31.779,lng:117.192},
+  {n:'笔架山',l2:'政务',etps:253,jobs:544,lat:31.842,lng:117.244},
+  {n:'荷叶地',l2:'政务',etps:187,jobs:401,lat:31.836,lng:117.232},
+  {n:'天鹅湖',l2:'政务',etps:144,jobs:308,lat:31.830,lng:117.220},
+  {n:'市政务办公区',l2:'政务',etps:125,jobs:268,lat:31.850,lng:117.236},
+  {n:'奥体中心',l2:'政务',etps:85,jobs:181,lat:31.844,lng:117.228},
+  {n:'骆岗',l2:'包河',etps:341,jobs:732,lat:31.808,lng:117.338},
+  {n:'葛大店',l2:'包河',etps:186,jobs:398,lat:31.795,lng:117.310},
+  {n:'合家福',l2:'包河',etps:150,jobs:320,lat:31.783,lng:117.298},
+  {n:'姚公庙',l2:'包河',etps:114,jobs:244,lat:31.784,lng:117.360},
+  {n:'巢湖路',l2:'包河',etps:105,jobs:224,lat:31.810,lng:117.355},
+  {n:'宁国路',l2:'包河',etps:99,jobs:211,lat:31.820,lng:117.340},
+  {n:'元一时代广场',l2:'瑶海',etps:239,jobs:511,lat:31.907,lng:117.360},
+  {n:'瑶海万达广场',l2:'瑶海',etps:221,jobs:473,lat:31.893,lng:117.380},
+  {n:'七里站',l2:'瑶海',etps:127,jobs:270,lat:31.928,lng:117.325},
+  {n:'三里街',l2:'瑶海',etps:79,jobs:167,lat:31.915,lng:117.330},
+  {n:'保利东郡',l2:'瑶海',etps:88,jobs:187,lat:31.941,lng:117.396},
+  {n:'陶冲湖',l2:'新站',etps:380,jobs:815,lat:31.938,lng:117.502},
+  {n:'武里山天街',l2:'新站',etps:164,jobs:350,lat:31.918,lng:117.488},
+  {n:'火车站',l2:'新站',etps:149,jobs:319,lat:31.870,lng:117.478},
+  {n:'职教城',l2:'新站',etps:149,jobs:318,lat:31.948,lng:117.512},
+  {n:'瑶海家具城',l2:'新站',etps:114,jobs:244,lat:31.882,lng:117.466},
+  {n:'寿春路',l2:'庐阳',etps:145,jobs:310,lat:31.907,lng:117.258},
+  {n:'杏林花园',l2:'庐阳',etps:142,jobs:303,lat:31.912,lng:117.274},
+  {n:'四里河',l2:'庐阳',etps:118,jobs:251,lat:31.892,lng:117.218},
+  {n:'华孚城隍庙',l2:'庐阳',etps:90,jobs:191,lat:31.900,lng:117.262},
+  {n:'财富广场',l2:'庐阳',etps:84,jobs:178,lat:31.905,lng:117.280},
+  {n:'滨湖世纪城',l2:'滨湖新区',etps:158,jobs:337,lat:31.658,lng:117.302},
+  {n:'四十六中',l2:'滨湖新区',etps:131,jobs:280,lat:31.652,lng:117.338},
+  {n:'滨湖前城',l2:'滨湖新区',etps:116,jobs:247,lat:31.644,lng:117.266},
+  {n:'滨湖假日',l2:'滨湖新区',etps:85,jobs:181,lat:31.648,lng:117.316},
+  {n:'环湖CBD',l2:'滨湖新区',etps:63,jobs:134,lat:31.640,lng:117.352},
+  {n:'肥东县城',l2:'肥东',etps:277,jobs:589,lat:31.852,lng:117.636},
+  {n:'肥东新城',l2:'肥东',etps:256,jobs:544,lat:31.838,lng:117.656},
+  {n:'肥西县城',l2:'肥西',etps:550,jobs:1176,lat:31.718,lng:117.008},
+  {n:'岗集',l2:'长丰',etps:95,jobs:203,lat:32.088,lng:117.320},
+  {n:'半汤',l2:'巢湖',etps:22,jobs:47,lat:31.758,lng:117.896},
+];
+
+const districtCenters = {
+  '蜀山区':[31.78,117.15,11.5],'包河区':[31.77,117.36,11.5],
+  '瑶海区':[31.91,117.38,11.5],'庐阳区':[31.90,117.25,12.5],
+  '长丰县':[32.24,117.17,10],'肥东县':[31.88,117.66,10],
+  '肥西县':[31.72,117.00,10],'庐江县':[31.20,117.29,10],
+  '巢湖市':[31.62,117.87,10],
+  '经开区':[31.72,117.33,12.5],'新站区':[31.93,117.50,12.5],
+  '高新区':[31.87,117.14,12.5],'滨湖新区':[31.65,117.32,12.5],
+  'overview':[31.78,117.22,9.5],
+};
+
+// =========== COLOR ===========
+let currentMetric = 'abs';
+
+function getAbsColor(etps) {
+  if (!etps) return '#f1f5f9';
+  if (etps < 200)  return '#fef3e8';
+  if (etps < 500)  return '#fed7aa';
+  if (etps < 800)  return '#fb923c';
+  if (etps < 1500) return '#f97316';
+  if (etps < 2500) return '#ea580c';
+  if (etps < 3500) return '#c2410c';
+  return '#7c2d12';
+}
+function getDensityColor(den) {
+  if (!den || den < 0.01) return '#f1f5f9';
+  if (den < 0.5)  return '#fef3e8';
+  if (den < 2)    return '#fed7aa';
+  if (den < 6)    return '#fb923c';
+  if (den < 10)   return '#f97316';
+  if (den < 13)   return '#ea580c';
+  return '#7c2d12';
+}
+function getFeatureColor(name) {
+  const d = officialData[name];
+  if (!d) return '#f1f5f9';
+  const den = d.etps / d.area_km2;
+  return currentMetric === 'den' ? getDensityColor(den) : getAbsColor(d.etps);
+}
+function zoneColor(etps) {
+  if (etps < 100)  return '#2563eb';
+  if (etps < 500)  return '#7c3aed';
+  if (etps < 1000) return '#db2777';
+  if (etps < 2000) return '#dc2626';
+  return '#991b1b';
+}
+
+// =========== MAP ===========
+const map = L.map('map', { zoomSnap:0.25, wheelPxPerZoomLevel:120 })
+             .setView([31.78, 117.28], 9.5);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{
+  attribution:'© OpenStreetMap © CARTO', subdomains:'abcd', maxZoom:18
+}).addTo(map);
+
+let activeLayer = null;
+let districtLayer = null;
+
+fetch('https://geo.datav.aliyun.com/areas_v3/bound/340100_full.json')
+  .then(r=>{ if(!r.ok)throw new Error(); return r.json(); })
+  .then(geoData=>{
+    document.getElementById('loading').style.display='none';
+    buildChoropleth(geoData);
+    buildLabels(geoData);
+  })
+  .catch(()=>{
+    document.getElementById('loading').innerHTML=
+      '<p style="color:#ef4444;text-align:center;padding:20px;font-size:13px;">⚠️ 边界数据加载失败（需联网）<br>请刷新重试</p>';
+    setTimeout(()=>document.getElementById('loading').style.display='none',3500);
+  });
+
+function buildChoropleth(geoData) {
+  districtLayer = L.geoJSON(geoData, {
+    style(f) {
+      const name = f.properties.name;
+      const d = officialData[name];
+      const etps = d ? d.etps : 0;
+      return { fillColor:getFeatureColor(name), fillOpacity:etps===0?.3:.72, color:'rgba(255,255,255,0.9)', weight:1.5, opacity:1 };
+    },
+    onEachFeature(f, layer) {
+      const name = f.properties.name;
+      const d = officialData[name];
+      if(!d) return;
+      const den = (d.etps/d.area_km2).toFixed(2);
+      const pct = (d.etps/TOTAL_ETPS*100).toFixed(1);
+      layer.on('mouseover', function(e){
+        if(this!==activeLayer) this.setStyle({fillOpacity:.90,weight:2.5,color:'#1e293b'});
+        this.bindTooltip(
+          `<b>${name}</b>
+           <div style="margin-top:5px"><span class="tip-val">${d.etps.toLocaleString()}</span><span class="tip-sub"> 家唯一企业 (${pct}%)</span></div>
+           <div class="tip-sub">在架职位：${d.jobs.toLocaleString()} 个</div>
+           <div class="tip-den">📍 密度：${den} 家/km² · 面积 ${d.area_km2} km²</div>`,
+          {sticky:true,direction:'top',className:'map-tip',offset:[0,-4]}
+        ).openTooltip(e.latlng);
+      });
+      layer.on('mousemove',function(e){this.getTooltip()?.setLatLng(e.latlng)});
+      layer.on('mouseout',function(){
+        if(this!==activeLayer) districtLayer.resetStyle(this);
+        this.closeTooltip();
+      });
+      layer.on('click',function(){
+        if(activeLayer&&activeLayer!==this) districtLayer.resetStyle(activeLayer);
+        this.setStyle({fillOpacity:.95,weight:3,color:'#0f172a'});
+        activeLayer=this;
+        showSidebar(name,d);
+      });
+    }
+  }).addTo(map);
+}
+
+function buildLabels(geoData){
+  geoData.features.forEach(f=>{
+    const name=f.properties.name, d=officialData[name];
+    if(!d) return;
+    const coords=f.geometry.type==='MultiPolygon'?f.geometry.coordinates[0][0]:f.geometry.coordinates[0];
+    let sLat=0,sLng=0,n=0;
+    coords.forEach(([lng,lat])=>{sLat+=lat;sLng+=lng;n++;});
+    L.marker([sLat/n,sLng/n],{
+      icon:L.divIcon({className:'',
+        html:`<div style="background:rgba(0,0,0,0.48);border-radius:6px;padding:3px 8px;white-space:nowrap;pointer-events:none;font-weight:700;color:white;font-size:11px;text-align:center;line-height:1.6;text-shadow:0 1px 2px rgba(0,0,0,.5);">${name}<br><span style="color:#fed7aa;font-size:11.5px;">${d.etps>=1000?(d.etps/1000).toFixed(1)+'k':d.etps}家</span></div>`,
+        iconAnchor:[32,14]
+      }),interactive:false,zIndexOffset:-200
+    }).addTo(map);
+  });
+}
+
+function switchMetric(m){
+  currentMetric=m;
+  document.getElementById('btn-abs').classList.toggle('active',m==='abs');
+  document.getElementById('btn-den').classList.toggle('active',m==='den');
+  if(districtLayer){
+    districtLayer.eachLayer(layer=>{
+      const name=layer.feature?.properties?.name;
+      const d=officialData[name];
+      if(!name||!d) return;
+      layer.setStyle({fillColor:getFeatureColor(name),fillOpacity:d.etps===0?.3:.72});
+    });
+  }
+  buildLegend();
+}
+
+const zoneMarkers=[];
+Object.entries(zoneData).forEach(([name,d])=>{
+  const r=Math.max(8,Math.min(36,Math.sqrt(d.etps)*1.5));
+  const m=L.circleMarker([d.lat,d.lng],{
+    radius:r,fillColor:zoneColor(d.etps),fillOpacity:.55,color:'white',weight:1.5,opacity:.9
+  });
+  m.bindTooltip(
+    `<b>${name} <span style="font-size:12px;color:#94a3b8;">(${d.parent})</span></b>
+     <div style="margin-top:4px"><span class="tip-val">${d.etps.toLocaleString()}</span><span class="tip-sub"> 家唯一企业</span></div>
+     <div class="tip-sub">在架职位：${d.jobs.toLocaleString()} 个</div>`,
+    {sticky:true,direction:'top',className:'map-tip',offset:[0,-r-2]}
+  );
+  m.on('click',()=>{ const od=officialData[d.parent]; if(od) showSidebar(d.parent,od,name); });
+  zoneMarkers.push(m);
+});
+
+const subMarkers=[];
+subAreaData.forEach(s=>{
+  const r=Math.max(5,Math.min(20,Math.sqrt(s.etps)*1.2));
+  const m=L.circleMarker([s.lat,s.lng],{
+    radius:r,fillColor:'#0ea5e9',fillOpacity:.45,color:'#0369a1',weight:1,opacity:.8
+  });
+  m.bindTooltip(
+    `<b>${s.n}</b><div class="tip-sub">${s.l2} · 三级地域</div>
+     <div style="margin-top:4px"><span class="tip-val">${s.etps}</span><span class="tip-sub"> 家企业 / ${s.jobs} 个职位</span></div>`,
+    {sticky:true,direction:'top',className:'map-tip',offset:[0,-r-2]}
+  );
+  subMarkers.push(m);
+});
+
+let zonesVis=false,subsVis=false;
+map.on('zoomend',()=>{
+  const z=map.getZoom();
+  if(z>=11&&!zonesVis){zoneMarkers.forEach(m=>m.addTo(map));zonesVis=true;}
+  else if(z<11&&zonesVis){zoneMarkers.forEach(m=>m.removeFrom(map));zonesVis=false;}
+  if(z>=12.5&&!subsVis){subMarkers.forEach(m=>m.addTo(map));subsVis=true;}
+  else if(z<12.5&&subsVis){subMarkers.forEach(m=>m.removeFrom(map));subsVis=false;}
+  document.getElementById('zoom-hint').style.opacity=z>=11?'0':'1';
+});
+
+function showSidebar(officialName,d,highlightZone){
+  document.getElementById('sb-name').textContent=officialName;
+  document.getElementById('sb-etps').textContent=d.etps.toLocaleString();
+  document.getElementById('sb-jobs').textContent=d.jobs.toLocaleString();
+  document.getElementById('sb-area').textContent=d.area_km2.toLocaleString();
+  const den=(d.etps/d.area_km2).toFixed(2);
+  document.getElementById('sb-den-val').textContent=den;
+  const denRow=document.getElementById('sb-density-row');
+  if(den>10) denRow.style.background='#fff7ed',denRow.style.color='#c2410c';
+  else if(den>1) denRow.style.background='#eff6ff',denRow.style.color='#1e40af';
+  else denRow.style.background='#f9fafb',denRow.style.color='#6b7280';
+
+  const zs=d.subzones.map(zn=>({name:zn,...zoneData[zn]})).filter(z=>z.etps);
+  const maxE=Math.max(...zs.map(z=>z.etps));
+  document.getElementById('sb-zones').innerHTML=zs
+    .sort((a,b)=>b.etps-a.etps)
+    .map(z=>{
+      const hl=z.name===highlightZone?'background:#eff6ff;':'';
+      return`<div class="sb-zone-row" style="${hl}" onclick="flyToZone('${z.name}')">
+        <div class="sb-zone-dot" style="background:${zoneColor(z.etps)}"></div>
+        <div style="flex:1">
+          <div class="sb-zone-name">${z.name}</div>
+          <div class="sb-zone-num">${z.etps}家 · ${z.jobs}职位</div>
+        </div>
+        <div class="sb-zone-bar-bg"><div class="sb-zone-bar" style="width:${Math.round(z.etps/maxE*100)}%"></div></div>
+      </div>`;
+    }).join('');
+  document.getElementById('sidebar').classList.add('open');
+}
+
+function flyToZone(zoneName){
+  const z=zoneData[zoneName];
+  if(z) map.flyTo([z.lat,z.lng],12.5,{duration:1.2});
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  if(activeLayer){districtLayer?.resetStyle(activeLayer);activeLayer=null;}
+}
+
+function switchTab(name){
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  const pane=document.getElementById('tab-'+name);
+  if(pane) pane.classList.add('active');
+  const btn=document.querySelector(`.tab-btn[data-tab="${name}"]`);
+  if(btn) btn.classList.add('active');
+}
+
+function toggleAccord(id){
+  document.querySelectorAll('.insight-item').forEach(item=>{
+    if(item.dataset.id===id) item.classList.toggle('open');
+    else item.classList.remove('open');
+  });
+}
+
+const subZoneToOfficial = {
+  '经开区':'包河区','滨湖新区':'包河区',
+  '高新区':'蜀山区','政务区':'蜀山区',
+  '新站区':'瑶海区','北城新区':'庐阳区'
+};
+function cardFly(name, zoom){
+  const c=districtCenters[name]||districtCenters['overview'];
+  map.flyTo([c[0],c[1]],zoom||c[2],{duration:1.2});
+  const officialName=subZoneToOfficial[name]||name;
+  const d=officialData[officialName];
+  if(d) setTimeout(()=>showSidebar(officialName,d),400);
+  window.scrollTo({top:document.querySelector('.map-card').offsetTop-80,behavior:'smooth'});
+}
+
+function buildLegend(){
+  const el=document.getElementById('legend');
+  let defs,title;
+  if(currentMetric==='abs'){
+    title='唯一在招企业数';
+    defs=[
+      {c:'#7c2d12',l:'3,500+'},{c:'#c2410c',l:'2,500–3,500'},
+      {c:'#ea580c',l:'1,500–2,500'},{c:'#f97316',l:'800–1,500'},
+      {c:'#fb923c',l:'500–800'},{c:'#fed7aa',l:'200–500'},
+      {c:'#fef3e8',l:'1–200'},{c:'#f1f5f9',l:'无数据',b:'#cbd5e1'},
+    ];
+  } else {
+    title='企业密度（家/km²）';
+    defs=[
+      {c:'#7c2d12',l:'13+（包河14.2）'},{c:'#ea580c',l:'10–13（庐阳12.1）'},
+      {c:'#f97316',l:'6–10（蜀山6.7）'},{c:'#fb923c',l:'2–6'},
+      {c:'#fed7aa',l:'0.5–2（肥西0.61）'},{c:'#fef3e8',l:'0–0.5（肥东0.38）'},
+      {c:'#f1f5f9',l:'≈0（巢湖0.07）',b:'#cbd5e1'},
+    ];
+  }
+  el.innerHTML=`<div class="leg-title">${title}</div>`+
+    defs.map(i=>`<div class="leg-row"><div class="leg-swatch" style="background:${i.c};${i.b?'border-color:'+i.b:''}"></div><span>${i.l}</span></div>`).join('')+
+    `<hr class="leg-sep"/>
+     <div class="leg-row"><div style="width:14px;height:14px;border-radius:50%;background:rgba(124,58,237,0.5);border:1.5px solid #7c3aed;flex-shrink:0"></div><span>58子区域<br><span style="color:#94a3b8;font-size:11px;">缩放≥11显示</span></span></div>
+     <div class="leg-row"><div style="width:10px;height:10px;border-radius:50%;background:rgba(14,165,233,0.5);border:1px solid #0369a1;flex-shrink:0"></div><span>三级地域<br><span style="color:#94a3b8;font-size:11px;">缩放≥12.5显示</span></span></div>`;
+}
+buildLegend();
+
+// =========== TABLE ===========
+const sorted=Object.entries(officialData).sort((a,b)=>b[1].etps-a[1].etps);
+
+function getTag(etps){
+  if(etps>=4000) return '<span class="cover-tag ct-h">核心热区</span>';
+  if(etps>=2000) return '<span class="cover-tag ct-w">活跃区</span>';
+  if(etps>=700)  return '<span class="cover-tag ct-m">成长区</span>';
+  if(etps>=200)  return '<span class="cover-tag ct-c">待开发</span>';
+  return '<span class="cover-tag ct-g">明显洼地</span>';
+}
+function denClass(den){
+  if(den>=10) return 'den-hi';
+  if(den>=2)  return 'den-md';
+  if(den>=0.3)return 'den-lo';
+  return 'den-0';
+}
+function rnBadge(i){
+  if(i===0)return`<span class="rn-badge rn-1">1</span>`;
+  if(i===1)return`<span class="rn-badge rn-2">2</span>`;
+  if(i===2)return`<span class="rn-badge rn-3">3</span>`;
+  return`<span class="rn-badge rn-n">${i+1}</span>`;
+}
+
+document.getElementById('table-body').innerHTML=sorted.map(([name,d],i)=>{
+  const pct=(d.etps/TOTAL_ETPS*100).toFixed(1);
+  const den=(d.etps/d.area_km2).toFixed(2);
+  return`<tr onclick="clickRow('${name}')">
+    <td>${rnBadge(i)}</td>
+    <td><strong>${name}</strong></td>
+    <td><strong>${d.etps.toLocaleString()}</strong> <span style="color:#94a3b8;font-size:12px;">(${pct}%)</span></td>
+    <td>${d.jobs.toLocaleString()}</td>
+    <td><span class="${denClass(parseFloat(den))}" style="font-weight:600">${den}</span></td>
+    <td>${getTag(d.etps)}</td>
+  </tr>`;
+}).join('');
+
+function clickRow(name){
+  const c=districtCenters[name];
+  if(c) map.flyTo([c[0],c[1]],c[2],{duration:1.2});
+  const d=officialData[name];
+  if(d) setTimeout(()=>showSidebar(name,d),400);
+  window.scrollTo({top:document.querySelector('.map-card').offsetTop-80,behavior:'smooth'});
+}
+
+// =========== ENTERPRISE DATA ===========
+const enterprises = [
+  { rank:1, name:'联宝科技',  eng:'Compal (Lenovo)',  ind:'电子制造',  zone:'经开区', lat:31.726,lng:117.326, scale:'3万+员工',  note:'蓝领操作工为主',   tag:'et-jk', color:'#ea580c' },
+  { rank:2, name:'科大讯飞',  eng:'iFlytek',          ind:'人工智能',  zone:'高新区', lat:31.865,lng:117.157, scale:'2.5万员工', note:'技术研发岗为主',   tag:'et-hx', color:'#7c3aed' },
+  { rank:3, name:'京东方',    eng:'BOE Technology',   ind:'显示面板',  zone:'新站区', lat:31.930,lng:117.505, scale:'2万+员工',  note:'工程师+操作技工', tag:'et-xz', color:'#0ea5e9' },
+  { rank:4, name:'江淮汽车',  eng:'JAC Motors',       ind:'汽车制造',  zone:'经开区', lat:31.718,lng:117.318, scale:'1.8万员工', note:'制造技工+研发',   tag:'et-jk', color:'#ea580c' },
+  { rank:5, name:'蔚来汽车',  eng:'NIO',              ind:'新能源汽车',zone:'经开区', lat:31.712,lng:117.342, scale:'1.5万员工', note:'技术+制造+售后',  tag:'et-jk', color:'#ea580c' },
+  { rank:6, name:'合力叉车',  eng:'HELI',             ind:'工程机械',  zone:'瑶海区', lat:31.908,lng:117.365, scale:'1.5万员工', note:'制造工人+销售',   tag:'et-yh', color:'#10b981' },
+  { rank:7, name:'长鑫存储',  eng:'CXMT',             ind:'半导体',    zone:'新站区', lat:31.942,lng:117.510, scale:'1万+员工',  note:'半导体专业工程师',tag:'et-xz', color:'#0ea5e9' },
+  { rank:8, name:'阳光电源',  eng:'Sungrow Power',    ind:'光伏逆变器',zone:'高新区', lat:31.870,lng:117.136, scale:'1万+员工',  note:'研发+制造+销售',  tag:'et-hx', color:'#7c3aed' },
+  { rank:9, name:'国轩高科',  eng:'Gotion High-tech', ind:'动力电池',  zone:'经开区', lat:31.722,lng:117.312, scale:'8,000员工', note:'化工/材料工程师', tag:'et-sk', color:'#f59e0b' },
+  {rank:10, name:'通威太阳能',eng:'Tongwei Solar',    ind:'光伏电池片',zone:'高新区', lat:31.848,lng:117.127, scale:'8,000员工', note:'制造操作工为主',   tag:'et-lj', color:'#ec4899' },
+];
+
+document.getElementById('ent-tbody').innerHTML = enterprises.map(e=>`
+  <tr onclick="flyToEnterprise(${e.lat},${e.lng},'${e.zone}')">
+    <td><span class="ent-rn ${e.rank<=3?'rn-top':'rn-norm'}">${e.rank}</span></td>
+    <td><div class="ent-name-pri">${e.name}</div><div class="ent-name-sec">${e.eng}</div></td>
+    <td style="color:var(--ink-3);font-size:12px;white-space:nowrap">${e.ind}</td>
+    <td><span class="ent-zone-tag ${e.tag}">${e.zone}</span></td>
+    <td style="color:var(--ink-3);font-size:12px;white-space:nowrap">${e.scale}</td>
+    <td style="color:var(--ink-3);font-size:12px">${e.note}</td>
+  </tr>
+`).join('');
+
+const entMarkers = enterprises.map(e=>{
+  const m = L.marker([e.lat, e.lng], {
+    icon: L.divIcon({
+      className:'',
+      html:`<div style="background:${e.color};color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.25);cursor:pointer">${e.rank}</div>`,
+      iconAnchor:[14,14]
+    }),
+    zIndexOffset:100
+  });
+  m.bindTooltip(
+    `<b style="font-size:14px">TOP${e.rank} ${e.name}</b>
+     <div class="tip-sub">${e.eng}</div>
+     <div style="margin-top:4px;color:#7dd3fc">${e.ind} · ${e.zone}</div>
+     <div class="tip-sub" style="margin-top:2px">员工规模：${e.scale}</div>
+     <div class="tip-sub">主要招聘：${e.note}</div>`,
+    {sticky:false,direction:'top',className:'map-tip',offset:[0,-16]}
+  );
+  return m;
+});
+
+map.on('zoomend',()=>{
+  const z=map.getZoom();
+  entMarkers.forEach(m=>{ if(z>=11) m.addTo(map); else m.removeFrom(map); });
+});
+
+function flyToEnterprise(lat,lng,zone){
+  map.flyTo([lat,lng],13,{duration:1.2});
+  window.scrollTo({top:document.querySelector('.map-card').offsetTop-80,behavior:'smooth'});
+  const zoneToParent={'经开区':'包河区','高新区':'蜀山区','新站区':'瑶海区','瑶海区':'瑶海区','蜀山区':'蜀山区','包河区':'包河区'};
+  const parent=zoneToParent[zone]||zone;
+  const d=officialData[parent];
+  if(d) setTimeout(()=>showSidebar(parent,d),600);
+}
+
+// =========== ECON BARS ===========
+const econData = [
+  {name:'包河区', gdp:2004, pop:122, flyZone:'包河区', note:'行政区本体 | 新能源汽车·制造（经开区单独核算）'},
+  {name:'蜀山区', gdp:1562, pop:163, flyZone:'蜀山区', note:'行政区本体 | 科技·教育·商业（高新区单独核算）'},
+  {name:'庐阳区', gdp:1361, pop: 72, flyZone:'庐阳区', note:'传统商业核心 | 金融·写字楼·零售'},
+  {name:'肥东县', gdp:1001, pop:108, flyZone:'肥东县', note:'综合制造·食品 | 合肥人口最多的县'},
+  {name:'长丰县', gdp:1050, pop: 90, flyZone:'长丰县', note:'新能源电池产业 | 承接主城制造转移'},
+  {name:'肥西县', gdp: 900, pop: 86, flyZone:'肥西县', note:'汽车配套·农业'},
+  {name:'瑶海区', gdp: 842, pop: 85, flyZone:'瑶海区', note:'行政区本体 | 工程机械·物流（新站区单独核算约327亿）'},
+  {name:'巢湖市', gdp: 670, pop: 79, flyZone:'巢湖市', note:'旅游·化工·农业 | 2011年并入合肥'},
+  {name:'庐江县', gdp: 580, pop: 81, flyZone:'庐江县', note:'矿产·化工 | 经济规模最小'},
+];
+const econColors = {
+  '蜀山区':'#8b5cf6','包河区':'#ea580c','庐阳区':'#f97316',
+  '瑶海区':'#06b6d4','长丰县':'#22d3ee','肥西县':'#84cc16',
+  '肥东县':'#10b981','巢湖市':'#9ca3af','庐江县':'#d1d5db'
+};
+const maxEcon = Math.max(...econData.map(e=>e.gdp));
+
+document.getElementById('econ-bars').innerHTML = econData.map(e=>{
+  const pct = Math.round(e.gdp/maxEcon*100);
+  const clr = econColors[e.name]||'#9ca3af';
+  return`<div class="econ-row">
+    <div class="econ-lbl">${e.name}</div>
+    <div class="econ-bar-bg" onclick="cardFly('${e.flyZone}')">
+      <div class="econ-bar" style="width:${pct}%;background:${clr}"></div>
+    </div>
+    <div class="econ-vals">
+      <div class="econ-gdp">${e.gdp}亿</div>
+      <div class="econ-pop">${e.pop}万人</div>
+    </div>
+    <div class="econ-note">${e.note}</div>
+  </div>`;
+}).join('');
+</script>
+</body>
+</html>
